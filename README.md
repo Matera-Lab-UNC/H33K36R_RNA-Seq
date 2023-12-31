@@ -2,4 +2,4 @@
 ## Author: Benjamin McMichael
 ## Date: 12-31-2023
 
-[![DOI](https://zenodo.org/badge/87882374.svg)](https://zenodo.org/badge/latestdoi/87882374)
+[![DOI](https://zenodo.org/badge/737605647.svg)](https://zenodo.org/doi/10.5281/zenodo.10447575)
