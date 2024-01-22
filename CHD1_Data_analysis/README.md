@@ -14,8 +14,8 @@ Schoberleitner I, Bauer I, Huang A, Andreyeva EN, Sebald J, Pascher K, Rieder D,
 The prefetch command was used to load SRA data for all samples.
 \
 The fasterq-dump command was used to load fastq files for each sample.
-- Prefetch should be performed before fasterq-dump to speed up file downloads.
-\
+- Prefetch should be performed before fasterq-dump to speed up file downloads.\
+
 Fastq files were zipped using pigz.
 - Parallel implementation of gzip.
 - fasterq-dump does NOT have --gzip option.
