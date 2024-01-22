@@ -7,5 +7,5 @@
 All R files were run using r/4.1.0.
 
 ## Citations
-CHD1 fly head RNA-seq data was downloaded from:
+CHD1 fly head RNA-seq data was downloaded from:\
 Schoberleitner I, Bauer I, Huang A, Andreyeva EN, Sebald J, Pascher K, Rieder D, Brunner M, Podhraski V, Oemer G, Cázarez-García D, Rieder L, Keller MA, Winkler R, Fyodorov DV, Lusser A. CHD1 controls H3.3 incorporation in adult brain chromatin to maintain metabolic homeostasis and normal lifespan. Cell Rep. 2021 Oct 5;37(1):109769. doi: 10.1016/j.celrep.2021.109769. PMID: 34610319; PMCID: PMC8607513.
