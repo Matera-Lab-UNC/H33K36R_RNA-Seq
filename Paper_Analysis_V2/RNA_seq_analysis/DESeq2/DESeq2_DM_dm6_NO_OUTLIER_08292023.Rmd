@@ -1,0 +1,1168 @@
+---
+title: "DESeq2_BM_forStrand_NO_OUTLIER_08292023"
+author: "Benjamin McMichael"
+date: "8/29/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(DESeq2)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(EnhancedVolcano)
+library(AnnotationDbi)
+library(org.Dm.eg.db)
+
+setwd("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/RNA_seq_analysis/DESeq2")
+currentDate <- Sys.Date() %>% format("%Y%m%d")
+
+makeDensityColorVector = function(dataFrame, xColName, yColName, n = 100, densValColName = 'densVals'){
+  require(MASS)
+  if (is.na(dataFrame[[xColName]]) == T | is.na(dataFrame[[yColName]]) == T){
+    print('NAs produced. Removing')
+    dataFrame = dataFrame[!is.na(dataFrame[[xColName]]),]
+    dataFrame = dataFrame[!is.na(dataFrame[[yColName]])]
+  }
+  dens = MASS::kde2d(x = dataFrame[[xColName]], y = dataFrame[[yColName]], n = n)
+  ix = findInterval(dataFrame[[xColName]], dens$x)
+  iy = findInterval(dataFrame[[yColName]], dens$y)
+  ii = cbind(ix, iy)
+  dataFrame[densValColName] = dens$z[ii]
+  return(dataFrame)
+}
+
+```
+
+```{r}
+
+filteredCounts <- read.table("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/RNA_seq_analysis/Counts/featureCounts_sortedByCoord_forStrand.txt", header = TRUE, row.names =1) %>% 
+  dplyr::rename("Sample_MATA_LB_JB_70" = "MATA_LB_JB_70.y_Adel_f_ACGTCGTT_S1_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_71" = "MATA_LB_JB_71.y_Adel_m_GTCCTGTT_S2_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_72" = "MATA_LB_JB_72.o_Adel_f_AGAAGCCT_S3_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_73" = "MATA_LB_JB_73.o_Adel_m_GAAGATCC_S4_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_74" = "MATA_LB_JB_74.y_K36_f_TAGCTGAG_S5_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_75" = "MATA_LB_JB_75.y_K36_m_ACGTCCAA_S6_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_76" = "MATA_LB_JB_76.o_K36_f_CACACATC_S7_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_77" = "MATA_LB_JB_77.o_K36_m_CGGATCAA_S8_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_78" = "MATA_LB_JB_78.y_Adel_f_TCAGCCTT_S9_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_79" = "MATA_LB_JB_79.y_Adel_m_AAGGCTCT_S10_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_80" = "MATA_LB_JB_80.o_Adel_f_TGTTCCGT_S11_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_81" = "MATA_LB_JB_81.o_Adel_m_GGAATGTC_S12_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_82" = "MATA_LB_JB_82.y_K36_f_CATCCAAG_S13_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_83" = "MATA_LB_JB_83.y_K36_m_GTCAACAG_S14_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_84" = "MATA_LB_JB_84.o_K36_f_TCGCTATC_S15_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_85" = "MATA_LB_JB_85.o_K36_m_AGCCTATC_S16_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_86" = "MATA_LB_JB_86.y_Adel_f_TCGGATTC_S17_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_87" = "MATA_LB_JB_87.y_Adel_m_CGGAGTAT_S18_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_88" = "MATA_LB_JB_88.o_Adel_f_GAACCTTC_S19_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_89" = "MATA_LB_JB_89.o_Adel_m_AGAGGATG_S20_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_90" = "MATA_LB_JB_90.y_K36_f_ACGCTTCT_S21_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_91" = "MATA_LB_JB_91.y_K36_m_CACAGGAA_S22_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_92" = "MATA_LB_JB_92.o_K36_f_ACGAATCC_S23_Aligned.sortedByCoord.out.bam",
+                "Sample_MATA_LB_JB_93" = "MATA_LB_JB_93.o_K36_m_CCTTCCAT_S24_Aligned.sortedByCoord.out.bam"
+  )
+
+filteredCountTable_NO_OUTLIER <- filteredCounts[,c(6:18, 20:29)]
+
+```
+
+```{r}
+# Read in sample info
+
+filteredsampleInfo_NO_OUTLIER <- read.csv("sample_info_NO_OUTLIER.txt")
+
+```
+
+```{r}
+# Check sample order
+
+colnames(filteredCountTable_NO_OUTLIER)
+filteredsampleInfo_NO_OUTLIER$run
+all(filteredsampleInfo_NO_OUTLIER$run == colnames(filteredCountTable_NO_OUTLIER))
+
+```
+
+```{r}
+### NO Interaction Model ####
+
+filteredsampleInfo_NO_OUTLIER_age_geno <- filteredsampleInfo_NO_OUTLIER
+age_geno <- factor(c("young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "young_K36R", "old_K36R", "old_K36R",
+                  "young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "old_K36R", "old_K36R",
+                  "young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "young_K36R", "old_K36R", "old_K36R")
+                            )
+filteredsampleInfo_NO_OUTLIER_age_geno$age_geno <- age_geno
+
+dds <- DESeqDataSetFromMatrix(countData = filteredCountTable_NO_OUTLIER, colData = filteredsampleInfo_NO_OUTLIER_age_geno, design = ~ sex + age_geno)
+dds$age_geno = relevel(dds$age_geno, "young_Adel")
+dds <- DESeq(dds)
+
+```
+
+```{r}
+# Export normalized counts
+
+normCounts <- counts(dds, normalized=T)
+write.csv(as.data.frame(normCounts), 
+          file = paste0("DESeq2_",currentDate,"_dm6_forStrand_noINT_noOUT_normCounts.csv"))
+
+```
+
+```{r}
+# Export PCA: No Interaction Model
+
+vsd <- vst(dds, blind=FALSE)
+
+pcaData <- plotPCA(vsd, intgroup=c("sex", "age_geno"), returnData=TRUE)
+percentVar <- round(100* attr(pcaData, "percentVar"))
+
+pdf(file = paste0("DESeq2_dm6_forStrand_noINT_noOUT_PCA_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+ggplot(pcaData, aes(PC1, PC2, color=age_geno, shape = sex)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"%variance"))+
+  ylab(paste0("PC2: ",percentVar[2],"%variance"))+
+  ggtitle("H3.3K36R and H3.3AΔ RNA-seq PCA - dm6 - noINT - noOUT") +
+  geom_jitter()
+
+dev.off()
+
+```
+
+```{r}
+# youngFly Results
+
+youngFly_res <- results(dds, contrast = c("age_geno", "young_K36R", "young_Adel"))
+summary(youngFly_res, 0.05)
+
+```
+
+```{r}
+# Export youngFly MA plot
+
+plotMA(youngFly_res, ylim = c(-8, 8))
+
+pdf(file = paste0("DESeq2_youngFly_dm6_forStrand_noINT_noOUT_MAplot_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+youngFly_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  #ylim(c(-8, 8)) +
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 0)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < 0)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + 
+  theme_minimal()
+
+dev.off()
+
+pdf(file = paste0("DESeq2_youngFly_dm6_forStrand_noINT_noOUT_MAplot_yLim",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+youngFly_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  ylim(c(-8, 8)) +
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 0)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < 0)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + 
+  theme_minimal()
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngFly_sigCount_padj <- youngFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngFly_sigCount_padjLFC <- youngFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(youngFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# This adds extra columns with gene id and descriptions
+
+youngFly_res$symbol <- mapIds(org.Dm.eg.db, keys=row.names(youngFly_res), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+youngFly_res$name <- mapIds(org.Dm.eg.db, keys=row.names(youngFly_res), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+```
+
+```{r}
+# Volcano plot
+
+EnhancedVolcano(youngFly_res,
+                lab = youngFly_res$symbol,
+                selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "H3.3K36R v H3.3AΔ Differential Gene Expression - Young",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+```
+
+```{r}
+# Export full youngFly results
+
+youngFly_resOrdered <- youngFly_res[order(youngFly_res$padj),]
+write.csv(as.data.frame(youngFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# oldFly Results
+
+oldFly_res <- results(dds, contrast = c("age_geno", "old_K36R", "old_Adel"))
+summary(oldFly_res, 0.05)
+
+```
+
+```{r}
+# MA plot
+
+plotMA(oldFly_res, ylim = c(-8, 8))
+
+pdf(file = paste0("DESeq2_oldFly_dm6_forStrand_noINT_noOUT_MAplot_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+oldFly_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  #ylim(c(-8, 8)) +
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 0)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < 0)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + theme_minimal()
+
+dev.off()
+
+
+pdf(file = paste0("DESeq2_oldFly_dm6_forStrand_noINT_noOUT_MAplot_yLim",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+oldFly_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  ylim(c(-8, 8)) +
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 0)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < 0)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + theme_minimal()
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldFly_sigCount_padj <- oldFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldFly_sigCount_padjLFC <- oldFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(oldFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# This adds extra columns with gene id and descriptions
+
+oldFly_res$symbol <- mapIds(org.Dm.eg.db, keys=row.names(oldFly_res), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+oldFly_res$name <- mapIds(org.Dm.eg.db, keys=row.names(oldFly_res), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+```
+
+```{r}
+# Volcano plot
+
+EnhancedVolcano(oldFly_res,
+                lab = oldFly_res$symbol,
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "H3.3K36R v H3.3AΔ Differential Gene Expression - Old",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+```
+
+```{r}
+# Export full oldFly results
+
+oldFly_resOrdered <- oldFly_res[order(oldFly_res$padj),]
+write.csv(as.data.frame(oldFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# Old Adel vs Young Adel without interaction (for Harmony)
+
+Adelta_res <- results(dds, contrast = c("age_geno", "old_Adel", "young_Adel"))
+summary(Adelta_res, 0.05)
+
+```
+
+```{r}
+# Export Old Adel vs Young Adel without interaction
+
+Adelta_resOrdered <- Adelta_res[order(Adelta_res$padj),]
+write.csv(as.data.frame(Adelta_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngAdelta_oldAdelta_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# Old H33K36R vs Young H33K36R without interaction (for Harmony)
+
+K36R_res <- results(dds, contrast = c("age_geno", "old_K36R", "young_K36R"))
+summary(K36R_res, 0.05)
+
+```
+
+```{r}
+# Export Old H33K36R vs Young H33K36R without interaction
+
+K36R_resOrdered <- K36R_res[order(K36R_res$padj),]
+write.csv(as.data.frame(K36R_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngK36R_oldK36R_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+### Interaction Model ####
+
+dds_int <- DESeqDataSetFromMatrix(countData = filteredCountTable_NO_OUTLIER, colData = filteredsampleInfo_NO_OUTLIER, design = ~ sex + age + geno + age:geno)
+dds_int$age = relevel(dds_int$age, "young")
+dds_int <- DESeq(dds_int)
+
+```
+
+```{r}
+# Export normalized counts
+
+normCounts_int <- counts(dds_int, normalized=T)
+write.csv(as.data.frame(normCounts_int), 
+          file = paste0("DESeq2_",currentDate,"_dm6_forStrand_wINT_noOUT_normCounts.csv"))
+
+```
+
+```{r}
+# Plot PCA
+
+vsd_int <- vst(dds_int, blind=FALSE)
+
+pcaData_int <- plotPCA(vsd_int, intgroup=c("sex", "age", "geno"), returnData=TRUE)
+percentVar_int <- round(100* attr(pcaData_int, "percentVar"))
+
+ggplot(pcaData_int, aes(PC1, PC2, color=geno, shape = sex)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"%variance"))+
+  ylab(paste0("PC2: ",percentVar[2],"%variance"))+
+  ggtitle("H3.3K36R and H3.3AΔ RNA-seq PCA - dm6 - wINT - noOUT") +
+  geom_jitter()
+
+```
+
+```{r}
+# the age effect for Adelta (the main effect)
+
+Adelta_age_res <- results(dds_int, contrast = c("age", "old", "young"), alpha = 0.05)
+summary(Adelta_age_res)
+
+```
+
+```{r}
+# MA plot
+
+plotMA(Adelta_age_res, ylim = c(-2, 2))
+
+Adelta_age_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 1)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < -1)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + theme_minimal()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+Adelta_age_sigCount_padj <- Adelta_age_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(Adelta_age_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+Adelta_age_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_Adelta_age_dm6_forStrand_wINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+Adelta_age_sigCount_padjLFC <- Adelta_age_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(Adelta_age_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+Adelta_age_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_Adelta_age_dm6_forStrand_wINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# This adds extra columns with gene id and descriptions
+
+Adelta_age_res$symbol <- mapIds(org.Dm.eg.db, keys=row.names(Adelta_age_res), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+Adelta_age_res$name <- mapIds(org.Dm.eg.db, keys=row.names(Adelta_age_res), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+```
+
+```{r}
+# Volcano plot
+
+EnhancedVolcano(Adelta_age_res,
+                lab = Adelta_age_res$symbol,
+                selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Old H3.3AΔ v Young H3.3AΔ Differential Gene Expression",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+```
+
+```{r}
+# Export full Adelta_age results
+
+Adelta_age_resOrdered <- Adelta_age_res[order(Adelta_age_res$padj),]
+write.csv(as.data.frame(Adelta_age_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_Adelta_age_dm6_forStrand_wINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# the age effect for K36R
+# this is, by definition, the main effect *plus* the interaction term
+# (the extra condition effect in K36R compared to Adelta)
+
+K36R_age_res <- results(dds_int, list(c("age_old_vs_young","ageold.genoK36R")), alpha = 0.05)
+summary(K36R_age_res)
+
+```
+
+```{r}
+# MA plot
+
+plotMA(K36R_age_res, ylim = c(-2, 2))
+
+K36R_age_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 1)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < -1)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + theme_minimal()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+K36R_age_sigCount_padj <- K36R_age_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(K36R_age_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+K36R_age_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_K36R_age_dm6_forStrand_wINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+K36R_age_sigCount_padjLFC <- K36R_age_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(K36R_age_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+K36R_age_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_K36R_age_dm6_forStrand_wINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# This adds extra columns with gene id and descriptions
+
+K36R_age_res$symbol <- mapIds(org.Dm.eg.db, keys=row.names(K36R_age_res), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+K36R_age_res$name <- mapIds(org.Dm.eg.db, keys=row.names(K36R_age_res), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+```
+
+```{r}
+# Volcano plot
+
+EnhancedVolcano(K36R_age_res,
+                lab = K36R_age_res$symbol,
+                selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Old K36R v Young K36R Differential Gene Expression",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+```
+
+```{r}
+# Export full H33K36R_age results
+
+K36R_age_resOrdered <- K36R_age_res[order(K36R_age_res$padj),]
+write.csv(as.data.frame(K36R_age_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_K36R_age_forStrand_dm6_wINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# the interaction term, answering: is the age effect *different* across genotypes?
+
+interaction_res <- results(dds_int, name = "ageold.genoK36R", alpha = 0.05)
+summary(interaction_res)
+
+```
+
+```{r}
+# MA plot
+
+plotMA(interaction_res, ylim = c(-2, 2))
+
+interaction_res %>%
+  data.frame() %>%
+  tidyr::drop_na('log2FoldChange') %>%
+  dplyr::mutate(., baseMean.log = log10(baseMean)) %>%
+  makeDensityColorVector(., xColName = 'baseMean.log', yColName = 'log2FoldChange', n = 200) %>%
+  ggplot(aes(x = baseMean.log, y = log2FoldChange)) + 
+  geom_point(aes(color = densVals), size=0.2) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange > 1)},
+             color = "#ff0000", 
+             size=1, alpha=0.5) +
+  geom_point(data = function(x){x %>% dplyr::filter(padj < 0.05) %>% dplyr::filter(log2FoldChange < -1)},
+             color = "#009acd", 
+             size=1, alpha=0.5) +
+  scale_color_gradientn(colours = colorRampPalette(c('grey85', 'black'))(100))  + theme_minimal()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+interaction_sigCount_padj <- interaction_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(interaction_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+interaction_sigCount_padj$symbol <- mapIds(org.Dm.eg.db, keys=row.names(interaction_sigCount_padj), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+interaction_sigCount_padj$name <- mapIds(org.Dm.eg.db, keys=row.names(interaction_sigCount_padj), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+interaction_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_interaction_dm6_forStrand_wINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+interaction_sigCount_padjLFC <- interaction_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(interaction_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+interaction_sigCount_padjLFC$symbol <- mapIds(org.Dm.eg.db, keys=row.names(interaction_sigCount_padjLFC), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+interaction_sigCount_padjLFC$name <- mapIds(org.Dm.eg.db, keys=row.names(interaction_sigCount_padjLFC), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+interaction_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_interaction_dm6_forStrand_wINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# This adds extra columns with gene id and descriptions
+
+interaction_res$symbol <- mapIds(org.Dm.eg.db, keys=row.names(interaction_res), column="SYMBOL", keytype="FLYBASE", multiVals="first")
+interaction_res$name <- mapIds(org.Dm.eg.db, keys=row.names(interaction_res), column="GENENAME", keytype="FLYBASE", multiVals="first")
+
+```
+
+```{r}
+# Export Volcano plot: Interaction
+
+pdf(file = paste0("DESeq2_interaction_dm6_forStrand_wINT_noOUT_volcanoPlot_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+EnhancedVolcano(interaction_res,
+                lab = interaction_res$symbol,
+                selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                xlim = c(-10, 10),
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Interaction Differential Gene Expression",
+                legendLabSize = 10,
+                legendIconSize = 3.0)
+
+dev.off()
+
+```
+
+```{r}
+# Export full interaction results
+
+interaction_resOrdered <- interaction_res[order(interaction_res$padj),]
+write.csv(as.data.frame(interaction_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_interaction_dm6_forStrand_wINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# Export Volcano plot: Interaction
+
+interaction_res_rename <- interaction_res %>%
+                              data.frame() %>%
+                              dplyr::mutate(symbol = str_replace(symbol, "CG18067", "Bbd"))
+
+pdf(file = paste0("DESeq2_interaction_dm6_forStrand_wINT_noOUT_volcanoPlot_yLim15Small_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+EnhancedVolcano(interaction_res_rename,
+                lab = interaction_res_rename$symbol,
+                selectLab = c("dhd", "cad", "to", "Mtk", "Dro", "Bbd", "IBIN", "SPH93",
+                              "BomBc1",  "BomS5", "BomS1", "AttA", "Sid", "otu"),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                xlim = c(-8, 8),
+                ylim = c(0, 15),
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Interaction Differential Gene Expression",
+                legendLabSize = 10,
+                legendIconSize = 3.0,
+                drawConnectors = TRUE,
+                colConnectors = "black",
+                widthConnectors =  1)
+
+dev.off()
+
+pdf(file = paste0("DESeq2_interaction_dm6_forStrand_wINT_noOUT_volcanoPlot_yLim40Large_",currentDate,".pdf"),
+    width = 9, 
+    height = 6)
+
+EnhancedVolcano(interaction_res_rename,
+                lab = interaction_res_rename$symbol,
+                selectLab = c("dhd", "cad", "to", "Mtk", "Dro", "Bbd", "IBIN", "SPH93",
+                              "BomBc1",  "BomS5", "BomS1", "AttA", "Sid", "otu"),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                xlim = c(-8, 8),
+                ylim = c(0, 40),
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Interaction Differential Gene Expression",
+                legendLabSize = 10,
+                legendIconSize = 3.0,
+                drawConnectors = TRUE,
+                colConnectors = "black",
+                widthConnectors =  1)
+
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+### SEX COMPARISON!
+
+
+```{r}
+### NO Interaction Model ####
+
+sex_age_geno <- factor(c("f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "m_young_K36R", "f_old_K36R", "m_old_K36R",
+                  "f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "f_old_K36R", "m_old_K36R",
+                  "f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "m_young_K36R", "f_old_K36R", "m_old_K36R")
+                            )
+
+filteredsampleInfo_NO_OUTLIER_sex_age_geno <- filteredsampleInfo_NO_OUTLIER
+filteredsampleInfo_NO_OUTLIER_sex_age_geno$sex_age_geno <- sex_age_geno
+
+dds <- DESeqDataSetFromMatrix(countData = filteredCountTable_NO_OUTLIER, colData = filteredsampleInfo_NO_OUTLIER_sex_age_geno, design = ~ sex_age_geno)
+dds <- DESeq(dds)
+
+```
+
+```{r}
+# Export normalized counts
+
+normCounts <- counts(dds, normalized=T)
+write.csv(as.data.frame(normCounts), 
+          file = paste0("DESeq2_",currentDate,"_dm6_forStrand_noINT_noOUT_sexSpecific_normCounts.csv"))
+
+```
+
+```{r}
+# Plot PCA
+
+vsd <- vst(dds, blind=FALSE)
+
+pcaData <- plotPCA(vsd, intgroup=c("sex_age_geno"), returnData=TRUE)
+percentVar <- round(100* attr(pcaData, "percentVar"))
+
+ggplot(pcaData, aes(PC1, PC2, color=sex_age_geno)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"%variance"))+
+  ylab(paste0("PC2: ",percentVar[2],"%variance"))+
+  ggtitle("Old Female H3.3K36R and H3.3AΔ RNA-seq PCA - dm6 - noINT - noOUT") +
+  geom_jitter()
+
+```
+
+```{r}
+# youngFemaleFly Results
+
+youngFemaleFly_res <- results(dds, contrast = c("sex_age_geno", "f_young_K36R", "f_young_Adel"))
+summary(youngFemaleFly_res, 0.05)
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngFemaleFly_sigCount_padj <- youngFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFemaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngFemaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngFemaleFly_sigCount_padjLFC <- youngFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFemaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngFemaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full youngFemaleFly results
+
+youngFemaleFly_resOrdered <- youngFemaleFly_res[order(youngFemaleFly_res$padj),]
+write.csv(as.data.frame(youngFemaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# oldFemaleFly Results
+
+oldFemaleFly_res <- results(dds, contrast = c("sex_age_geno", "f_old_K36R", "f_old_Adel"))
+summary(oldFemaleFly_res, 0.05)
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldFemaleFly_sigCount_padj <- oldFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFemaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldFemaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldFemaleFly_sigCount_padjLFC <- oldFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFemaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldFemaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full oldFemaleFly results
+
+oldFemaleFly_resOrdered <- oldFemaleFly_res[order(oldFemaleFly_res$padj),]
+write.csv(as.data.frame(oldFemaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# youngMaleFly Results
+
+youngMaleFly_res <- results(dds, contrast = c("sex_age_geno", "m_young_K36R", "m_young_Adel"))
+summary(youngMaleFly_res, 0.05)
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngMaleFly_sigCount_padj <- youngMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngMaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngMaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngMaleFly_sigCount_padjLFC <- youngMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngMaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngMaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full youngMaleFly results
+
+youngMaleFly_resOrdered <- youngMaleFly_res[order(youngMaleFly_res$padj),]
+write.csv(as.data.frame(youngMaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# oldMaleFly Results
+
+oldMaleFly_res <- results(dds, contrast = c("sex_age_geno", "m_old_K36R", "m_old_Adel"))
+summary(oldMaleFly_res, 0.05)
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldMaleFly_sigCount_padj <- oldMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldMaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldMaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldMaleFly_sigCount_padjLFC <- oldMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldMaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldMaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full oldMaleFly results
+
+oldMaleFly_resOrdered <- oldMaleFly_res[order(oldMaleFly_res$padj),]
+write.csv(as.data.frame(oldMaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```

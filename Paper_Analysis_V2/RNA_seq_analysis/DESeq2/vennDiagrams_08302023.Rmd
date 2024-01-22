@@ -1,0 +1,638 @@
+---
+title: "vennDiagrams_08302023"
+author: "Benjamin McMichael"
+date: "8/30/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(ggplot2)
+library(eulerr)
+library(nVennR)
+library(Vennerable)
+library(grid)
+
+setwd("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/RNA_seq_analysis/DESeq2")
+currentDate <- Sys.Date() %>% format("%Y%m%d")
+
+```
+
+```{r}
+# Import raw data and subset genes with adjusted p-value < 0.05
+
+youngFly_sigCounts_padj <- read.csv("DESeq2_20230829_youngFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                   header=T, stringsAsFactors = F) %>% 
+                              dplyr::filter(padj < 0.05) %>%
+                              pull(X)
+
+oldFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                 header=T, stringsAsFactors = F) %>%
+                              dplyr::filter(padj < 0.05) %>%
+                              pull(X)
+
+Adelta_sigCounts_padj <- read.csv("DESeq2_20230829_Adelta_age_dm6_forStrand_wINT_noOUT_res.csv", 
+                                 header=T, stringsAsFactors = F) %>% 
+                              dplyr::filter(padj < 0.05) %>%
+                              pull(X)
+
+K36R_sigCounts_padj <- read.csv("DESeq2_20230829_K36R_age_forStrand_dm6_wINT_noOUT_res.csv", 
+                               header=T, stringsAsFactors = F) %>% 
+                             dplyr::filter(padj < 0.05) %>%
+                             pull(X)
+
+interaction_sigCounts_padj <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                      header=T, stringsAsFactors = F) %>% 
+                                   dplyr::filter(padj < 0.05) %>%
+                                   pull(X)
+
+Chd1_sigCounts_padj <- read.csv("/nas/longleaf/home/bdmcmi/work/Benjamin/flyHead_analysis/CHD1_Data_analysis/DESeq2/DESeq2_20230629_Chd1Def_sigCounts.csv", 
+                               header=T, stringsAsFactors = F) %>% 
+                           dplyr::filter(padj < 0.05) %>%
+                           pull(X)
+
+youngFemaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_youngFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   pull(X)  
+
+oldFemaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   pull(X)                                        
+
+youngMaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_youngMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   pull(X) 
+
+oldMaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   pull(X) 
+
+```
+
+```{r}
+# Import raw data and subset genes with adjusted p-value < 0.05 & log2FC > 1 or < -1
+
+youngFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_youngFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                   header=T, stringsAsFactors = F) %>% 
+                              dplyr::filter(padj < 0.05) %>%
+                              dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                              pull(X)
+
+oldFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                 header=T, stringsAsFactors = F) %>%
+                              dplyr::filter(padj < 0.05) %>%
+                              dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                              pull(X)
+
+Adelta_sigCounts_padjLFC <- read.csv("DESeq2_20230829_Adelta_age_dm6_forStrand_wINT_noOUT_res.csv", 
+                                 header=T, stringsAsFactors = F) %>% 
+                              dplyr::filter(padj < 0.05) %>%
+                              dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                              pull(X)
+
+K36R_sigCounts_padjLFC <- read.csv("DESeq2_20230829_K36R_age_forStrand_dm6_wINT_noOUT_res.csv", 
+                               header=T, stringsAsFactors = F) %>% 
+                             dplyr::filter(padj < 0.05) %>%
+                             dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                             pull(X)
+
+interaction_sigCounts_padjLFC <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                      header=T, stringsAsFactors = F) %>% 
+                                   dplyr::filter(padj < 0.05) %>%
+                                   dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                                   pull(X)
+
+Chd1_sigCounts_padjLFC <- read.csv("/nas/longleaf/home/bdmcmi/work/Benjamin/flyHead_analysis/CHD1_Data_analysis/DESeq2/DESeq2_20230629_Chd1Def_sigCounts.csv", 
+                               header=T, stringsAsFactors = F) %>% 
+                           dplyr::filter(padj < 0.05) %>%
+                           dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                           pull(X)
+
+youngFemaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_youngFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                                   pull(X)
+
+oldFemaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                                   pull(X)                                        
+
+youngMaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_youngMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                                   pull(X)
+
+oldMaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                       header=T, stringsAsFactors = F) %>%
+                                   dplyr::filter(padj < 0.05) %>%
+                                   dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                                   pull(X) 
+
+```
+
+```{r}
+# Determine youngFly and oldFly Differential Gene overlap - padj < 0.05
+
+oldFly_youngFly_inCommon_padj <- dplyr::intersect(oldFly_sigCounts_padj, youngFly_sigCounts_padj) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padj)
+
+```
+
+```{r}
+# Euler Diagram of youngFly vs oldFly - padj < 0.05
+
+old_young_vennList_padj <- list("Young" = youngFly_sigCounts_padj,
+                                "Old" = oldFly_sigCounts_padj)
+
+old_young_colors <- c("slateblue1", "green")
+
+old_young_fit_padj <- euler(old_young_vennList_padj)
+
+oldFly_youngFly_euler_padj <- plot(old_young_fit_padj,
+                             fills = old_young_colors,
+                             main = "youngFly vs oldFly: padj < 0.05",
+                             legend = TRUE,
+                             alpha = 0.5,
+                             quantities = TRUE)
+
+png(filename = paste0("oldFly_youngFly_euler_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+oldFly_youngFly_euler_padj
+
+dev.off()
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly - padj < 0.05
+
+oldFly_youngFly_vennList_padj <- list("Young" = youngFly_sigCounts_padj,
+                                      "Old" = oldFly_sigCounts_padj)
+
+oldFly_youngFly_venn_padj <- compute.Venn(Venn(old_young_vennList_padj))
+
+gp <- VennThemes(oldFly_youngFly_venn_padj)
+gp[["Face"]][["10"]]$fill <- "slateblue1"
+gp[["Face"]][["01"]]$fill <- "green"
+
+png(filename = paste0("oldFly_youngFly_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFly_youngFly_padj_vennDiagram <- Vennerable::plot(oldFly_youngFly_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFly and oldFly Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFly_youngFly_inCommon_padjLFC <- dplyr::intersect(oldFly_sigCounts_padjLFC, youngFly_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padjLFC)
+
+```
+
+```{r}
+# Euler Diagram of youngFly vs oldFly - padj < 0.05 & log2FC > 1 or < -1
+
+old_young_vennList_padjLFC <- list("Young" = youngFly_sigCounts_padjLFC,
+                                   "Old" = oldFly_sigCounts_padjLFC)
+
+old_young_colorsLFC <- c("slateblue1", "green")
+
+old_young_fit_padjLFC <- euler(old_young_vennList_padjLFC)
+
+oldFly_youngFly_euler_padjLFC <- plot(old_young_fit_padjLFC,
+                                 fills = old_young_colorsLFC,
+                                 main = "youngFly vs oldFly: padj < 0.05 & log2FC > |1|",
+                                 legend = TRUE,
+                                 alpha = 0.5,
+                                 quantities = TRUE)
+
+png(filename = paste0("oldFly_youngFly_euler_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+oldFly_youngFly_euler_padjLFC
+
+dev.off()
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly - padj < 0.05 & log2FC > 1 or < -1
+
+oldFly_youngFly_vennList_padjLFC <- list("Young" = youngFly_sigCounts_padjLFC,
+                                         "Old" = oldFly_sigCounts_padjLFC)
+
+oldFly_youngFly_venn_padjLFC <- compute.Venn(Venn(old_young_vennList_padjLFC))
+
+gp <- VennThemes(oldFly_youngFly_venn_padjLFC)
+gp[["Face"]][["10"]]$fill <- "slateblue1"
+gp[["Face"]][["01"]]$fill <- "green"
+
+png(filename = paste0("oldFly_youngFly_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFly_youngFly_padjLFC_vennDiagram <- Vennerable::plot(oldFly_youngFly_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFly vs oldFly vs interaction Differential Gene overlap - padj < 0.05
+
+oldFly_youngFly_inCommon_padj <- dplyr::intersect(oldFly_sigCounts_padj, youngFly_sigCounts_padj) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padj)
+
+oldFly_interaction_inCommon_padj <- dplyr::intersect(oldFly_sigCounts_padj, interaction_sigCounts_padj) %>% data.frame()
+nrow(oldFly_interaction_inCommon_padj)
+
+youngFly_interaction_inCommon_padj <- dplyr::intersect(youngFly_sigCounts_padj, interaction_sigCounts_padj) %>% data.frame()
+nrow(youngFly_interaction_inCommon_padj)
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly vs interaction - padj < 0.05
+
+old_young_interaction_vennList_padj <- list("Young" = youngFly_sigCounts_padj,
+                                            "Old" = oldFly_sigCounts_padj,
+                                            "interaction" = interaction_sigCounts_padj)
+
+old_young_interaction_venn_padj <- compute.Venn(Venn(old_young_interaction_vennList_padj))
+
+gp <- VennThemes(old_young_interaction_venn_padj)
+gp[["Face"]][["100"]]$fill <- "slateblue1"
+gp[["Face"]][["010"]]$fill <- "green"
+gp[["Face"]][["001"]]$fill <- "red"
+
+png(filename = paste0("old_young_interaction_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+old_young_interaction_venn_padj <- Vennerable::plot(old_young_interaction_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFly vs oldFly vs interaction Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFly_youngFly_inCommon_padjLFC <- dplyr::intersect(oldFly_sigCounts_padjLFC, youngFly_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padjLFC)
+
+oldFly_interaction_inCommon_padjLFC <- dplyr::intersect(oldFly_sigCounts_padjLFC, interaction_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFly_interaction_inCommon_padjLFC)
+
+youngFly_interaction_inCommon_padjLFC <- dplyr::intersect(youngFly_sigCounts_padjLFC, interaction_sigCounts_padjLFC) %>% data.frame()
+nrow(youngFly_interaction_inCommon_padjLFC)
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly vs interaction - padj < 0.05 & log2FC > 1 or < -1
+
+old_young_interaction_vennList_padjLFC <- list("Young" = youngFly_sigCounts_padjLFC,
+                                            "Old" = oldFly_sigCounts_padjLFC,
+                                            "interaction" = interaction_sigCounts_padjLFC)
+
+old_young_interaction_venn_padjLFC <- compute.Venn(Venn(old_young_interaction_vennList_padjLFC))
+
+gp <- VennThemes(old_young_interaction_venn_padjLFC)
+gp[["Face"]][["100"]]$fill <- "slateblue1"
+gp[["Face"]][["010"]]$fill <- "green"
+gp[["Face"]][["001"]]$fill <- "red"
+
+png(filename = paste0("old_young_interaction_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+old_young_interaction_venn_padjLFC <- Vennerable::plot(old_young_interaction_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFemaleFly and youngMaleFly Differential Gene overlap - padj < 0.05
+
+youngFemaleFly_youngMaleFly_inCommon_padj <- dplyr::intersect(youngFemaleFly_sigCounts_padj, youngMaleFly_sigCounts_padj) %>% data.frame()
+nrow(youngFemaleFly_youngMaleFly_inCommon_padj)
+
+```
+
+```{r}
+# Venn Diagram of Female Young vs Male Young - padj < 0.05
+
+youngFemaleFly_youngMaleFly_vennList_padj <- list("youngFemale" = youngFemaleFly_sigCounts_padj,
+                                                  "youngMale" = youngMaleFly_sigCounts_padj)
+
+youngFemaleFly_youngMaleFly_venn_padj <- compute.Venn(Venn(youngFemaleFly_youngMaleFly_vennList_padj))
+
+gp <- VennThemes(youngFemaleFly_youngMaleFly_venn_padj)
+gp[["Face"]][["10"]]$fill <- "pink"
+gp[["Face"]][["01"]]$fill <- "lightblue"
+
+png(filename = paste0("youngFemaleFly_youngMaleFly_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+youngFemaleFly_youngMaleFly_venn_padj <- Vennerable::plot(youngFemaleFly_youngMaleFly_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFemaleFly and oldMaleFly Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+youngFemaleFly_youngMaleFly_inCommon_padjLFC <- dplyr::intersect(youngFemaleFly_sigCounts_padjLFC, 
+                                                                 youngMaleFly_sigCounts_padjLFC) %>% data.frame()
+nrow(youngFemaleFly_youngMaleFly_inCommon_padjLFC)
+
+```
+
+```{r}
+# Venn Diagram of Female Young vs Male Young - padj < 0.05 & log2FC > 1 or < -1
+
+youngFemaleFly_youngMaleFly_vennList_padjLFC <- list("youngFemale" = youngFemaleFly_sigCounts_padjLFC,
+                                                     "youngMale" = youngMaleFly_sigCounts_padjLFC)
+
+youngFemaleFly_youngMaleFly_venn_padjLFC <- compute.Venn(Venn(youngFemaleFly_youngMaleFly_vennList_padjLFC))
+
+gp <- VennThemes(youngFemaleFly_youngMaleFly_venn_padjLFC)
+gp[["Face"]][["10"]]$fill <- "pink"
+gp[["Face"]][["01"]]$fill <- "lightblue"
+
+png(filename = paste0("youngFemaleFly_youngMaleFly_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+youngFemaleFly_youngMaleFly_venn_padjLFC <- Vennerable::plot(youngFemaleFly_youngMaleFly_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine oldFemaleFly and oldMaleFly Differential Gene overlap - padj < 0.05
+
+oldFemaleFly_oldMaleFly_inCommon_padj <- dplyr::intersect(oldFemaleFly_sigCounts_padj, oldMaleFly_sigCounts_padj) %>% data.frame()
+nrow(oldFemaleFly_oldMaleFly_inCommon_padj)
+
+```
+
+```{r}
+# Venn Diagram of Female Old vs Male Old - padj < 0.05
+
+oldFemaleFly_oldMaleFly_vennList_padj <- list("oldFemale" = oldFemaleFly_sigCounts_padj,
+                                              "oldMale" = oldMaleFly_sigCounts_padj)
+
+oldFemaleFly_oldMaleFly_venn_padj <- compute.Venn(Venn(oldFemaleFly_oldMaleFly_vennList_padj))
+
+gp <- VennThemes(oldFemaleFly_oldMaleFly_venn_padj)
+gp[["Face"]][["10"]]$fill <- "pink"
+gp[["Face"]][["01"]]$fill <- "lightblue"
+
+png(filename = paste0("oldFemaleFly_oldMaleFly_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFemaleFly_oldMaleFly_venn_padj <- Vennerable::plot(oldFemaleFly_oldMaleFly_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine oldFemaleFly and oldMaleFly Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFemaleFly_oldMaleFly_inCommon_padjLFC <- dplyr::intersect(oldFemaleFly_sigCounts_padjLFC, oldMaleFly_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFemaleFly_oldMaleFly_inCommon_padjLFC)
+
+```
+
+```{r}
+# Venn Diagram of Female Old vs Male Old - padj < 0.05 & log2FC > 1 or < -1
+
+oldFemaleFly_oldMaleFly_vennList_padjLFC <- list("oldFemale" = oldFemaleFly_sigCounts_padjLFC,
+                                                 "oldMale" = oldMaleFly_sigCounts_padjLFC)
+
+oldFemaleFly_oldMaleFly_venn_padjLFC <- compute.Venn(Venn(oldFemaleFly_oldMaleFly_vennList_padjLFC))
+
+gp <- VennThemes(oldFemaleFly_oldMaleFly_venn_padjLFC)
+gp[["Face"]][["10"]]$fill <- "pink"
+gp[["Face"]][["01"]]$fill <- "lightblue"
+
+png(filename = paste0("oldFemaleFly_oldMaleFly_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFemaleFly_oldMaleFly_venn_padjLFC <- Vennerable::plot(oldFemaleFly_oldMaleFly_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFly vs oldFly vs Chd1 Differential Gene overlap - padj < 0.05
+
+oldFly_youngFly_inCommon_padj <- dplyr::intersect(oldFly_sigCounts_padj, youngFly_sigCounts_padj) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padj)
+
+oldFly_Chd1_inCommon_padj <- dplyr::intersect(oldFly_sigCounts_padj, Chd1_sigCounts_padj) %>% data.frame()
+nrow(oldFly_Chd1_inCommon_padj)
+
+youngFly_Chd1_inCommon_padj <- dplyr::intersect(youngFly_sigCounts_padj, Chd1_sigCounts_padj) %>% data.frame()
+nrow(youngFly_Chd1_inCommon_padj)
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly vs Chd1 - padj < 0.05
+
+old_young_Chd1_vennList_padj <- list("Young" = youngFly_sigCounts_padj,
+                                     "Old" = oldFly_sigCounts_padj,
+                                     "Chd1" = Chd1_sigCounts_padj)
+
+old_young_Chd1_venn_padj <- compute.Venn(Venn(old_young_Chd1_vennList_padj))
+
+gp <- VennThemes(old_young_Chd1_venn_padj)
+gp[["Face"]][["100"]]$fill <- "blue"
+gp[["Face"]][["010"]]$fill <- "green"
+gp[["Face"]][["001"]]$fill <- "magenta"
+
+png(filename = paste0("old_young_Chd1_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+old_young_Chd1_vennList_padj <- Vennerable::plot(old_young_Chd1_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFly vs oldFly vs Chd1 Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFly_youngFly_inCommon_padjLFC <- dplyr::intersect(oldFly_sigCounts_padjLFC, youngFly_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFly_youngFly_inCommon_padjLFC)
+
+oldFly_Chd1_inCommon_padjLFC <- dplyr::intersect(oldFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFly_Chd1_inCommon_padjLFC)
+
+youngFly_Chd1_inCommon_padjLFC <- dplyr::intersect(youngFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC) %>% data.frame()
+nrow(youngFly_Chd1_inCommon_padjLFC)
+
+```
+
+```{r}
+# Venn Diagram of youngFly vs oldFly vs Chd1 - padj < 0.05 & log2FC > 1 or < -1
+
+old_young_Chd1_vennList_padjLFC <- list("Young" = youngFly_sigCounts_padjLFC,
+                                        "Old" = oldFly_sigCounts_padjLFC,
+                                        "Chd1" = Chd1_sigCounts_padjLFC)
+
+old_young_Chd1_venn_padjLFC <- compute.Venn(Venn(old_young_Chd1_vennList_padjLFC))
+
+gp <- VennThemes(old_young_Chd1_venn_padjLFC)
+gp[["Face"]][["100"]]$fill <- "blue"
+gp[["Face"]][["010"]]$fill <- "green"
+gp[["Face"]][["001"]]$fill <- "magenta"
+
+png(filename = paste0("old_young_Chd1_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+old_young_Chd1_vennList_padjLFC <- Vennerable::plot(old_young_Chd1_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine youngFemaleFly vs oldFemaleFly vs Chd1 Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFemaleFly_youngFemaleFly_inCommon_padjLFC <- dplyr::intersect(oldFemaleFly_sigCounts_padjLFC, 
+                                                                 youngFemaleFly_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFemaleFly_youngFemaleFly_inCommon_padjLFC)
+
+oldFemaleFly_Chd1_inCommon_padjLFC <- dplyr::intersect(oldFemaleFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFemaleFly_Chd1_inCommon_padjLFC)
+
+youngFemaleFly_Chd1_inCommon_padjLFC <- dplyr::intersect(youngFemaleFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC) %>% data.frame()
+nrow(youngFemaleFly_Chd1_inCommon_padjLFC)
+
+```
+
+```{r}
+# Euler Diagram of Female Young vs Female Old vs Chd1 - padj < 0.05 & log2FC > 1 or < -1
+
+youngFemaleFly_oldFemaleFly_Chd1_vennList_padjLFC <- list("youngFemale" = youngFemaleFly_sigCounts_padjLFC,
+                                                          "oldFemale" = oldFemaleFly_sigCounts_padjLFC,
+                                                          "Chd1" = Chd1_sigCounts_padjLFC)
+
+oldFemale_youngFemale_Chd1_colors <- c("slateblue1", "green", "magenta")
+
+youngFemaleFly_oldFemaleFly_Chd1_fit_padjLFC <- euler(youngFemaleFly_oldFemaleFly_Chd1_vennList_padjLFC)
+
+youngFemaleFly_oldFemaleFly_Chd1_euler_padjLFC <- plot(youngFemaleFly_oldFemaleFly_Chd1_fit_padjLFC,
+                             fills = oldFemale_youngFemale_Chd1_colors,
+                             legend = TRUE,
+                             alpha = 0.5,
+                             quantities = TRUE)
+
+png(filename = paste0("youngFemaleFly_oldFemaleFly_Chd1_euler_padjLFC_",currentDate,".png"), 
+    units = "in", width = 9, height = 6, res = 500)
+
+youngFemaleFly_oldFemaleFly_Chd1_euler_padjLFC
+
+dev.off()
+
+```
+
+```{r}
+# Venn Diagram of Female Young vs Female Old vs Chd1 - padj < 0.05 & log2FC > 1 or < -1
+
+youngFemaleFly_oldFemaleFly_Chd1_vennList_padjLFC <- list("youngFemale" = youngFemaleFly_sigCounts_padjLFC,
+                                                          "oldFemale" = oldFemaleFly_sigCounts_padjLFC,
+                                                          "Chd1" = Chd1_sigCounts_padjLFC)
+
+youngFemaleFly_oldFemaleFly_Chd1_venn_padjLFC <- compute.Venn(Venn(youngFemaleFly_oldFemaleFly_Chd1_vennList_padjLFC))
+
+gp <- VennThemes(youngFemaleFly_oldFemaleFly_Chd1_venn_padjLFC)
+gp[["Face"]][["100"]]$fill <- "slateblue1"
+gp[["Face"]][["010"]]$fill <- "green"
+gp[["Face"]][["001"]]$fill <- "magenta"
+
+png(filename = paste0("youngFemaleFly_oldFemaleFly_Chd1_Vennerable_padjLFC_",currentDate,".png"), 
+    units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+youngFemaleFly_oldFemaleFly_Chd1_venn_padjLFC <- Vennerable::plot(youngFemaleFly_oldFemaleFly_Chd1_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine oldFemaleFly and Chd1 Differential Gene overlap - padj < 0.05
+
+oldFemaleFly_Chd1_inCommon_padj <- dplyr::intersect(oldFemaleFly_sigCounts_padj, Chd1_sigCounts_padj) %>% data.frame()
+nrow(oldFemaleFly_Chd1_inCommon_padj)
+
+```
+
+```{r}
+# Venn Diagram of Female Old vs Chd1 - padj < 0.05
+
+oldFemaleFly_Chd1_vennList_padj <- list("oldFemale" = oldFemaleFly_sigCounts_padj,
+                                        "Chd1" = Chd1_sigCounts_padj)
+
+oldFemaleFly_Chd1_venn_padj <- compute.Venn(Venn(oldFemaleFly_Chd1_vennList_padj))
+
+gp <- VennThemes(oldFemaleFly_Chd1_venn_padj)
+gp[["Face"]][["10"]]$fill <- "slateblue1"
+gp[["Face"]][["01"]]$fill <- "magenta"
+
+png(filename = paste0("oldFemaleFly_Chd1_Vennerable_padj_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFemaleFly_Chd1_venn_padj <- Vennerable::plot(oldFemaleFly_Chd1_venn_padj, gp = gp)
+
+dev.off()
+
+```
+
+```{r}
+# Determine oldFemaleFly and Chd1 Differential Gene overlap - padj < 0.05 & log2FC > 1 or < -1
+
+oldFemaleFly_Chd1_inCommon_padjLFC <- dplyr::intersect(oldFemaleFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC) %>% data.frame()
+nrow(oldFemaleFly_Chd1_inCommon_padjLFC)
+
+```
+
+```{r}
+# Venn Diagram of Female Old vs Chd1 - padj < 0.05 & log2FC > 1 or < -1
+
+oldFemaleFly_Chd1_vennList_padjLFC <- list("oldFemale" = oldFemaleFly_sigCounts_padjLFC,
+                                           "Chd1" = Chd1_sigCounts_padjLFC)
+
+oldFemaleFly_Chd1_venn_padjLFC <- compute.Venn(Venn(oldFemaleFly_Chd1_vennList_padjLFC))
+
+gp <- VennThemes(oldFemaleFly_Chd1_venn_padjLFC)
+gp[["Face"]][["10"]]$fill <- "slateblue1"
+gp[["Face"]][["01"]]$fill <- "magenta"
+
+png(filename = paste0("oldFemaleFly_Chd1_Vennerable_padjLFC_",currentDate,".png"), units = "in", width = 9, height = 6, res = 500)
+
+grid.newpage()
+oldFemaleFly_Chd1_venn_padjLFC <- Vennerable::plot(oldFemaleFly_Chd1_venn_padjLFC, gp = gp)
+
+dev.off()
+
+```

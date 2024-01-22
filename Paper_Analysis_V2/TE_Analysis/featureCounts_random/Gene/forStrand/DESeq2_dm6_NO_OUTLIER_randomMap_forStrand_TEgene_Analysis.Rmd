@@ -1,0 +1,248 @@
+---
+title: "DESeq2_dm6_NO_OUTLIER_featureCounts_randomMap_forStrand_TEgene_Analysis"
+author: "Benjamin McMichael"
+date: "8/09/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(DESeq2)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(pheatmap)
+library(EnhancedVolcano)
+library(AnnotationDbi)
+library(org.Dm.eg.db)
+
+setwd("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/TE_Analysis/featureCounts_random/Gene/forStrand")
+currentDate <- Sys.Date() %>% format("%Y%m%d")
+
+```
+
+```{r}
+### Load TE Count Table from featureCounts ####
+
+TE_Counts <- read.table("sortedByCoord_randomMap_forStrand_TEgene_counts.txt", header = TRUE, row.names =1)
+TE_CountTable_NO_OUTLIER <- TE_Counts[,c(6:18, 20:29)]
+colnames(TE_CountTable_NO_OUTLIER) <- sapply(colnames(TE_CountTable_NO_OUTLIER), substr, 0,20)
+
+```
+
+```{r}
+# Read in sample info
+
+sampleInfo_NO_OUTLIER <- read.csv("sample_info_NO_OUTLIER.txt")
+sampleInfo_NO_OUTLIER <- DataFrame(sampleInfo_NO_OUTLIER)
+
+```
+
+```{r}
+# Check sample order
+
+colnames(TE_CountTable_NO_OUTLIER)
+rownames(sampleInfo_NO_OUTLIER) 
+all(rownames(sampleInfo_NO_OUTLIER) == colnames(TE_CountTable_NO_OUTLIER))
+
+```
+
+```{r}
+### NO Interaction Model ####
+
+sampleInfo_NO_OUTLIER_age_geno <- sampleInfo_NO_OUTLIER
+age_geno <- factor(c("young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "young_K36R", "old_K36R", "old_K36R",
+                  "young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "old_K36R", "old_K36R",
+                  "young_Adel", "young_Adel", "old_Adel", "old_Adel",
+                  "young_K36R", "young_K36R", "old_K36R", "old_K36R")
+                            )
+sampleInfo_NO_OUTLIER_age_geno$age_geno <- age_geno
+
+dds <- DESeqDataSetFromMatrix(countData = TE_CountTable_NO_OUTLIER, colData = sampleInfo_NO_OUTLIER_age_geno, design = ~ sex + age_geno)
+dds$age_geno = relevel(dds$age_geno, "young_Adel")
+dds <- DESeq(dds)
+
+```
+
+```{r}
+# Export normalized counts
+
+normCounts <- counts(dds, normalized=T)
+write.csv(as.data.frame(normCounts), 
+          file = paste0("DESeq2_",currentDate,"_dm6_noINT_noOUT_randomMap_forStrand_TEgene_normCounts.csv"))
+
+```
+
+```{r}
+# youngFly Results
+
+youngFly_res <- results(dds, contrast = c("age_geno", "young_K36R", "young_Adel"))
+summary(youngFly_res, 0.05)
+
+```
+
+```{r}
+# Volcano plot
+
+png(filename = paste0("youngFly_featureCounts_randomMap_forStrand_gene_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(youngFly_res,
+                lab = rownames(youngFly_res),
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Young Fly Differential TE Expression: Gene",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngFly_sigCount_padj <- youngFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngFly_sigCount_padjLFC <- youngFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(youngFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full youngFly results
+
+youngFly_resOrdered <- youngFly_res[order(youngFly_res$padj),]
+write.csv(as.data.frame(youngFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_res.csv"))
+
+```
+
+```{r}
+# oldFly Results
+
+oldFly_res <- results(dds, contrast = c("age_geno", "old_K36R", "old_Adel"))
+summary(oldFly_res, 0.05)
+
+```
+
+```{r}
+# Volcano plot
+
+png(filename = paste0("oldFly_featureCounts_randomMap_forStrand_gene_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(oldFly_res,
+                lab = rownames(oldFly_res),
+                selectLab = c("HETA", "BATUMI_LTR", "MICROPIA_LTR"),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Old Fly Differential TE Expression: Gene",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldFly_sigCount_padj <- oldFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldFly_sigCount_padjLFC <- oldFly_res %>%
+  data.frame() %>%
+  dplyr::filter(padj < 0.05) %>% 
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  dplyr::mutate(Enrichment = ifelse(log2FoldChange > 1, 'Up', 'Down'))
+table(oldFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full oldFly results
+
+oldFly_resOrdered <- oldFly_res[order(oldFly_res$padj),]
+write.csv(as.data.frame(oldFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldFly_dm6_noINT_noOUT_randomMap_forStrand_TEgene_res.csv"))
+
+```

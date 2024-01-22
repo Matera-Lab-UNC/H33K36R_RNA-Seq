@@ -1,0 +1,1392 @@
+---
+title: "geneEnrichmentAnalysis_forStrand_08082023"
+author: "Benjamin McMichael"
+date: "08/08/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(gprofiler2)
+library(clusterProfiler)
+library(forcats)
+library(msigdbr)
+library(org.Dm.eg.db)
+
+setwd("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/RNA_seq_analysis/DESeq2")
+currentDate <- Sys.Date() %>% format("%Y%m%d")
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1 or < -1
+
+oldFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X) 
+
+oldFemaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                           header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+oldMaleFly_sigCounts_padjLFC <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                           header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+Chd1_sigCounts_padjLFC <- read.csv("/nas/longleaf/home/bdmcmi/work/Benjamin/flyHead_analysis/CHD1_Data_analysis/DESeq2/DESeq2_20230629_Chd1Def_sigCounts.csv", 
+                                   header=T, stringsAsFactors = F) %>% 
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05
+
+oldFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X) 
+
+oldFemaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                           header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+oldMaleFly_sigCounts_padj <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv",
+                                           header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+Chd1_sigCounts_padj <- read.csv("/nas/longleaf/home/bdmcmi/work/Benjamin/flyHead_analysis/CHD1_Data_analysis/DESeq2/DESeq2_20230629_Chd1Def_sigCounts.csv", 
+                                   header=T, stringsAsFactors = F) %>% 
+  dplyr::filter(padj < 0.05) %>%
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+```
+
+```{r}
+# Subset Differential Genes in Common: oldFemale vs Chd1
+
+oldFemaleFly_Chd1_inCommon_padjLFC <- dplyr::intersect(oldFemaleFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC)
+
+```
+
+```{r}
+# Subset Differential Genes Unique to H33K36R: oldFemale vs Chd1
+
+oldFemaleFly_UNIQUE_Chd1_padjLFC <- dplyr::setdiff(oldFemaleFly_sigCounts_padjLFC, Chd1_sigCounts_padjLFC)
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes in Common: oldFemale vs Chd1
+
+oldFemaleFly_Chd1_inCommon_padjLFC_gostres <- gost(query = list("oldFemaleFly_Chd1_inCommon_padjLFC" = oldFemaleFly_Chd1_inCommon_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes in Common: oldFemale vs Chd1
+
+oldFemaleFly_Chd1_inCommon_padjLFC_gostresPlot <- gostplot(oldFemaleFly_Chd1_inCommon_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(oldFemaleFly_Chd1_inCommon_padjLFC_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFemaleFly_Chd1_inCommon_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes in Common: oldFemale vs Chd1
+
+publish_gosttable(oldFemaleFly_Chd1_inCommon_padjLFC_gostres, highlight_terms = oldFemaleFly_Chd1_inCommon_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFemaleFly_Chd1_inCommon_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes Unique: oldFemale vs Chd1
+
+oldFemaleFly_UNIQUE_Chd1_padjLFC_gostres <- gost(query = list("oldFemaleFly_UNIQUE_Chd1_padjLFC" = oldFemaleFly_UNIQUE_Chd1_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                 )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes Unique: oldFemale vs Chd1
+
+oldFemaleFly_UNIQUE_Chd1_padjLFC_gostresPlot <- gostplot(oldFemaleFly_UNIQUE_Chd1_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(oldFemaleFly_UNIQUE_Chd1_padjLFC_gostresPlot,
+                 width = 8,
+                 height = 6,
+                 filename = paste0("oldFemaleFly_UNIQUE_Chd1_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes Unique: oldFemale vs Chd1
+
+publish_gosttable(oldFemaleFly_UNIQUE_Chd1_padjLFC_gostres, highlight_terms = oldFemaleFly_UNIQUE_Chd1_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFemaleFly_UNIQUE_Chd1_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Facet Wrap GO Term Dot Plots: Old Female and Old Male: padj < 0.05
+## VERSION 2
+
+oldFemale_oldMale_padj_gostres <- gost(query = list( "oldFemaleFly_padj" = oldFemaleFly_sigCounts_padj,
+                                                     "oldMaleFly_padj" = oldMaleFly_sigCounts_padj),
+                                                     organism = "dmelanogaster",
+                                                     sources = c("GO", "KEGG", "REAC", "WP")
+                                                        )
+
+df_oldFemale_oldMale <- data.frame(oldFemale_oldMale_padj_gostres$result)
+df_oldFemale_oldMale$GeneRatio = df_oldFemale_oldMale$intersection_size/df_oldFemale_oldMale$query_size
+
+png(filename = paste0("oldFemale_oldMale_padj_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 12, 
+    height = 12, 
+    res = 500)
+
+facet.labs <- c(oldFemaleFly_padj = "Old Female",
+                oldMaleFly_padj = "Old Male")
+
+ggplot(df_oldFemale_oldMale) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color=GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colors=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(1.5, 6)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Old Female and Old Male - GO Analysis") +
+  facet_grid(~query, labeller = as_labeller(facet.labs))
+
+dev.off()
+
+```
+
+```{r}
+# Facet Wrap GO Term Dot Plots: Old Female and Old Male
+## VERSION 2
+
+oldFemale_oldMale_padjLFC_gostres <- gost(query = list( "oldFemaleFly_padjLFC" = oldFemaleFly_sigCounts_padjLFC,
+                                                        "oldMaleFly_padjLFC" = oldMaleFly_sigCounts_padjLFC),
+                                                        organism = "dmelanogaster",
+                                                        sources = c("GO", "KEGG", "REAC", "WP")
+                                                        )
+
+df_oldFemale_oldMale <- data.frame(oldFemale_oldMale_padjLFC_gostres$result)
+df_oldFemale_oldMale$GeneRatio = df_oldFemale_oldMale$intersection_size/df_oldFemale_oldMale$query_size
+
+png(filename = paste0("oldFemale_oldMale_padjLFC_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 12, 
+    height = 12, 
+    res = 500)
+
+facet.labs <- c(oldFemaleFly_padjLFC = "Old Female",
+                oldMaleFly_padjLFC = "Old Male")
+
+ggplot(df_oldFemale_oldMale) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color=GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colors=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(1.5, 6)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Old Female and Old Male - GO Analysis") +
+  facet_grid(~query, labeller = as_labeller(facet.labs))
+
+dev.off()
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_gostres <- gost(query = list("oldFly_padjLFC" = oldFly_sigCounts_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_gostresPlot <- gostplot(oldFly_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(oldFly_padjLFC_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFly_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+publish_gosttable(oldFly_padjLFC_gostres, highlight_terms = oldFly_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFly_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldFly H33K36R vs oldFly Adelta
+## VERSION 1
+
+df_oldFly <- data.frame(oldFly_padjLFC_gostres$result)
+df_oldFly$GeneRatio = df_oldFly$intersection_size/df_oldFly$query_size
+
+
+png(filename = paste0("oldFly_padjLFC_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFly) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Fly GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldFly H33K36R vs oldFly Adelta
+## Version 2
+
+df_oldFly <- data.frame(oldFly_padjLFC_gostres$result)
+df_oldFly$GeneRatio = df_oldFly$intersection_size/df_oldFly$query_size
+
+
+png(filename = paste0("oldFly_padjLFC_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFly) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color=GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colours=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(2, 8)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Old Fly GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1
+
+oldFly_sigCounts_padjLFC_UP <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - UPREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_UPREGULATED_gostres <- gost(query = list("oldFly_padjLFC_UPREGULATED" = oldFly_sigCounts_padjLFC_UP),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_UPREGULATED_gostresPlot <- gostplot(oldFly_padjLFC_UPREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldFly_padjLFC_UPREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFly_padjLFC_UPREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - UPREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+publish_gosttable(oldFly_padjLFC_UPREGULATED_gostres, highlight_terms = oldFly_padjLFC_UPREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFly_padjLFC_UPREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - UPREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+df_oldFly_UPREGULATED <- data.frame(oldFly_padjLFC_UPREGULATED_gostres$result)
+df_oldFly_UPREGULATED$GeneRatio = df_oldFly_UPREGULATED$intersection_size/df_oldFly_UPREGULATED$query_size
+
+
+png(filename = paste0("oldFly_padjLFC_UPREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFly_UPREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Fly-UPREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC < -1
+
+oldFly_sigCounts_padjLFC_DOWN <- read.csv("DESeq2_20230829_oldFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange < -1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - DOWNREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_DOWNREGULATED_gostres <- gost(query = list("oldFly_padjLFC_DOWNREGULATED" = oldFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - DOWNREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_DOWNREGULATED_gostresPlot <- gostplot(oldFly_padjLFC_DOWNREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldFly_padjLFC_DOWNREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFly_padjLFC_DOWNREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - DOWNREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+publish_gosttable(oldFly_padjLFC_DOWNREGULATED_gostres, highlight_terms = oldFly_padjLFC_DOWNREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFly_padjLFC_DOWNREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - DOWNREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+df_oldFly_DOWNREGULATED <- data.frame(oldFly_padjLFC_DOWNREGULATED_gostres$result)
+df_oldFly_DOWNREGULATED$GeneRatio = df_oldFly_DOWNREGULATED$intersection_size/df_oldFly_DOWNREGULATED$query_size
+
+
+png(filename = paste0("oldFly_padjLFC_DOWNREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFly_DOWNREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Fly-DOWNREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED and DOWNREGULATED Differential Genes: oldFly H33K36R vs oldFly Adelta
+
+oldFly_padjLFC_UP_DOWN_gostres <- gost(query = list("oldFly_padjLFC_UPREGULATED" = oldFly_sigCounts_padjLFC_UP,
+                                                    "oldFly_padjLFC_DOWNREGULATED" = oldFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+
+
+oldFly_padjLFC_UP_DOWN_gostresPlot <- gostplot(oldFly_padjLFC_UP_DOWN_gostres, interactive = FALSE)
+
+publish_gostplot(oldFly_padjLFC_UP_DOWN_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFly_padjLFC_UP_DOWN_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_gostres <- gost(query = list("oldFemaleFly_padjLFC" = oldFemaleFly_sigCounts_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_gostresPlot <- gostplot(oldFemaleFly_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(oldFemaleFly_padjLFC_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFemaleFly_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+publish_gosttable(oldFemaleFly_padjLFC_gostres, highlight_terms = oldFemaleFly_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFemaleFly_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+## VERSION 1
+
+df_oldFemale <- data.frame(oldFemaleFly_padjLFC_gostres$result)
+df_oldFemale$GeneRatio = df_oldFemale$intersection_size/df_oldFemale$query_size
+
+
+png(filename = paste0("oldFemaleFly_padjLFC_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFemale) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Female GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+## VERSION 2
+
+df_oldFemale <- data.frame(oldFemaleFly_padjLFC_gostres$result)
+df_oldFemale$GeneRatio = df_oldFemale$intersection_size/df_oldFemale$query_size
+
+
+png(filename = paste0("oldFemaleFly_padjLFC_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFemale) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color=GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colours=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(2, 8)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Old Female GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1
+
+oldFemaleFly_sigCounts_padjLFC_UP <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - UPREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_UPREGULATED_gostres <- gost(query = list("oldFemaleFly_padjLFC_UPREGULATED" = oldFemaleFly_sigCounts_padjLFC_UP),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_UPREGULATED_gostresPlot <- gostplot(oldFemaleFly_padjLFC_UPREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldFemaleFly_padjLFC_UPREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFemaleFly_padjLFC_UPREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - UPREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+publish_gosttable(oldFemaleFly_padjLFC_UPREGULATED_gostres, highlight_terms = oldFemaleFly_padjLFC_UPREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFemaleFly_padjLFC_UPREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - UPREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+df_oldFemaleFly_UPREGULATED <- data.frame(oldFemaleFly_padjLFC_UPREGULATED_gostres$result)
+df_oldFemaleFly_UPREGULATED$GeneRatio = df_oldFemaleFly_UPREGULATED$intersection_size/df_oldFemaleFly_UPREGULATED$query_size
+
+
+png(filename = paste0("oldFemaleFly_padjLFC_UPREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFemaleFly_UPREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Female Fly-UPREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC < -1
+
+oldFemaleFly_sigCounts_padjLFC_DOWN <- read.csv("DESeq2_20230829_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange < -1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - DOWNREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_DOWNREGULATED_gostres <- gost(query = list("oldFemaleFly_padjLFC_DOWNREGULATED" = oldFemaleFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - DOWNREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_DOWNREGULATED_gostresPlot <- gostplot(oldFemaleFly_padjLFC_DOWNREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldFemaleFly_padjLFC_DOWNREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFemaleFly_padjLFC_DOWNREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - DOWNREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+publish_gosttable(oldFemaleFly_padjLFC_DOWNREGULATED_gostres, highlight_terms = oldFemaleFly_padjLFC_DOWNREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldFemaleFly_padjLFC_DOWNREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - DOWNREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+df_oldFemaleFly_DOWNREGULATED <- data.frame(oldFemaleFly_padjLFC_DOWNREGULATED_gostres$result)
+df_oldFemaleFly_DOWNREGULATED$GeneRatio = df_oldFemaleFly_DOWNREGULATED$intersection_size/df_oldFemaleFly_DOWNREGULATED$query_size
+
+
+png(filename = paste0("oldFemaleFly_padjLFC_DOWNREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldFemaleFly_DOWNREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Female Fly-DOWNREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED and DOWNREGULATED Differential Genes: oldFemaleFly H33K36R vs oldFemaleFly Adelta
+
+oldFemaleFly_padjLFC_UP_DOWN_gostres <- gost(query = list("oldFemaleFly_padjLFC_UPREGULATED" = oldFemaleFly_sigCounts_padjLFC_UP,
+                                                          "oldFemaleFly_padjLFC_DOWNREGULATED" = oldFemaleFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+
+
+oldFemaleFly_padjLFC_UP_DOWN_gostresPlot <- gostplot(oldFemaleFly_padjLFC_UP_DOWN_gostres, interactive = FALSE)
+
+publish_gostplot(oldFemaleFly_padjLFC_UP_DOWN_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldFemaleFly_padjLFC_UP_DOWN_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_gostres <- gost(query = list("oldMaleFly_padjLFC" = oldMaleFly_sigCounts_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_gostresPlot <- gostplot(oldMaleFly_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(oldMaleFly_padjLFC_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldMaleFly_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+publish_gosttable(oldMaleFly_padjLFC_gostres, highlight_terms = oldMaleFly_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldMaleFly_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+## VERSION 1
+
+df_oldMale <- data.frame(oldMaleFly_padjLFC_gostres$result)
+df_oldMale$GeneRatio = df_oldMale$intersection_size/df_oldMale$query_size
+
+
+png(filename = paste0("oldMaleFly_padjLFC_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldMale) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Male GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+## VERSION 2
+
+df_oldMale <- data.frame(oldMaleFly_padjLFC_gostres$result)
+df_oldMale$GeneRatio = df_oldMale$intersection_size/df_oldMale$query_size
+
+png(filename = paste0("oldMaleFly_padjLFC_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldMale) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color=GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colours=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(2, 8)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Old Male GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1
+
+oldMaleFly_sigCounts_padjLFC_UP <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - UPREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_UPREGULATED_gostres <- gost(query = list("oldMaleFly_padjLFC_UPREGULATED" = oldMaleFly_sigCounts_padjLFC_UP),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_UPREGULATED_gostresPlot <- gostplot(oldMaleFly_padjLFC_UPREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldMaleFly_padjLFC_UPREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldMaleFly_padjLFC_UPREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - UPREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+publish_gosttable(oldMaleFly_padjLFC_UPREGULATED_gostres, highlight_terms = oldMaleFly_padjLFC_UPREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldMaleFly_padjLFC_UPREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - UPREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+df_oldMaleFly_UPREGULATED <- data.frame(oldMaleFly_padjLFC_UPREGULATED_gostres$result)
+df_oldMaleFly_UPREGULATED$GeneRatio = df_oldMaleFly_UPREGULATED$intersection_size/df_oldMaleFly_UPREGULATED$query_size
+
+
+png(filename = paste0("oldMaleFly_padjLFC_UPREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldMaleFly_UPREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Male Fly-UPREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC < -1
+
+oldMaleFly_sigCounts_padjLFC_DOWN <- read.csv("DESeq2_20230829_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange < -1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - DOWNREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_DOWNREGULATED_gostres <- gost(query = list("oldMaleFly_padjLFC_DOWNREGULATED" = oldMaleFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - DOWNREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_DOWNREGULATED_gostresPlot <- gostplot(oldMaleFly_padjLFC_DOWNREGULATED_gostres, interactive = FALSE)
+publish_gostplot(oldMaleFly_padjLFC_DOWNREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldMaleFly_padjLFC_DOWNREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - DOWNREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+publish_gosttable(oldMaleFly_padjLFC_DOWNREGULATED_gostres, highlight_terms = oldMaleFly_padjLFC_DOWNREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("oldMaleFly_padjLFC_DOWNREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - DOWNREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+df_oldMaleFly_DOWNREGULATED <- data.frame(oldMaleFly_padjLFC_DOWNREGULATED_gostres$result)
+df_oldMaleFly_DOWNREGULATED$GeneRatio = df_oldMaleFly_DOWNREGULATED$intersection_size/df_oldMaleFly_DOWNREGULATED$query_size
+
+
+png(filename = paste0("oldMaleFly_padjLFC_DOWNREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_oldMaleFly_DOWNREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Old Male Fly-DOWNREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED and DOWNREGULATED Differential Genes: oldMaleFly H33K36R vs oldMaleFly Adelta
+
+oldMaleFly_padjLFC_UP_DOWN_gostres <- gost(query = list("oldMaleFly_padjLFC_UPREGULATED" = oldMaleFly_sigCounts_padjLFC_UP,
+                                                        "oldMaleFly_padjLFC_DOWNREGULATED" = oldMaleFly_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+oldMaleFly_padjLFC_UP_DOWN_gostresPlot <- gostplot(oldMaleFly_padjLFC_UP_DOWN_gostres, interactive = FALSE)
+
+publish_gostplot(oldMaleFly_padjLFC_UP_DOWN_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("oldMaleFly_padjLFC_UP_DOWN_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 
+
+interaction_sigCounts_padj <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes: Interaction
+
+interaction_padj_gostres <- gost(query = list("interaction_padj" = interaction_sigCounts_padj),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: Interaction
+## VERSION 2
+
+df_interaction <- data.frame(interaction_padj_gostres$result)
+df_interaction$GeneRatio = df_interaction$intersection_size/df_interaction$query_size
+
+
+png(filename = paste0("interaction_padj_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_interaction) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color= GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colours=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(2, 8)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Interaction GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1 or < -1
+
+interaction_sigCounts_padjLFC <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                  header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+  pull(X)
+
+```
+
+```{r}
+# Perform GO Analysis - Differential Genes: Interaction
+
+interaction_padjLFC_gostres <- gost(query = list("interaction_padjLFC" = interaction_sigCounts_padjLFC),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - Differential Genes: Interaction
+
+interaction_padjLFC_gostresPlot <- gostplot(interaction_padjLFC_gostres, interactive = FALSE)
+publish_gostplot(interaction_padjLFC_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("interaction_padjLFC_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - Differential Genes: Interaction
+
+publish_gosttable(interaction_padjLFC_gostres, highlight_terms = interaction_padjLFC_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("interaction_padjLFC_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: Interaction
+## VERSION 1
+
+df_interaction <- data.frame(interaction_padjLFC_gostres$result)
+df_interaction$GeneRatio = df_interaction$intersection_size/df_interaction$query_size
+
+
+png(filename = paste0("interaction_padjLFC_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_interaction) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Interaction GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - Differential Genes: Interaction
+## VERSION 2
+
+df_interaction <- data.frame(interaction_padjLFC_gostres$result)
+df_interaction$GeneRatio = df_interaction$intersection_size/df_interaction$query_size
+
+
+png(filename = paste0("interaction_padjLFC_GO_DotPlot_",currentDate,"_V2.png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_interaction) +
+  aes(-log10(p_value), fct_reorder(term_name, -log10(p_value))) +
+  geom_point(aes(color= GeneRatio, size = intersection_size)) +
+  scale_color_gradientn(colours=c("blue", "red"), guide=guide_colorbar(order=1)) +
+  scale_size_continuous(range=c(2, 8)) +
+  theme_minimal() +
+  labs(color = "Gene Ratio", size = "Gene Count") +
+  xlab("-log10(p-value)") +
+  ylab(NULL) +
+  ggtitle("Interaction GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC > 1
+
+interaction_sigCounts_padjLFC_UP <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                    header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange > 1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - UPREGULATED Differential Genes: Interaction
+
+interaction_padjLFC_UPREGULATED_gostres <- gost(query = list("interaction_padjLFC_UPREGULATED" = interaction_sigCounts_padjLFC_UP),
+                                                          organism = "dmelanogaster",
+                                                          sources = c("GO", "KEGG", "REAC", "WP")
+                                                          )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED Differential Genes: Interaction
+
+interaction_padjLFC_UPREGULATED_gostresPlot <- gostplot(interaction_padjLFC_UPREGULATED_gostres, interactive = FALSE)
+publish_gostplot(interaction_padjLFC_UPREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("interaction_padjLFC_UPREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - UPREGULATED Differential Genes: Interaction
+
+publish_gosttable(interaction_padjLFC_UPREGULATED_gostres, highlight_terms = interaction_padjLFC_UPREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("interaction_padjLFC_UPREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - UPREGULATED Differential Genes: Interaction
+
+df_interaction_UPREGULATED <- data.frame(interaction_padjLFC_UPREGULATED_gostres$result)
+df_interaction_UPREGULATED$GeneRatio = df_interaction_UPREGULATED$intersection_size/df_interaction_UPREGULATED$query_size
+
+
+png(filename = paste0("interaction_padjLFC_UPREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_interaction_UPREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Interaction- UPREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Import Raw Data and Subset Genes with Adjusted p-value < 0.05 & log2FC < -1
+
+interaction_sigCounts_padjLFC_DOWN <- read.csv("DESeq2_20230829_interaction_dm6_forStrand_wINT_noOUT_res.csv", 
+                                    header=T, stringsAsFactors = F) %>%
+  dplyr::filter(padj < 0.05) %>%
+  dplyr::filter(log2FoldChange < -1) %>%
+  pull(X) 
+
+```
+
+```{r}
+# Perform GO Analysis - DOWNREGULATED Differential Genes: Interaction
+
+interaction_padjLFC_DOWNREGULATED_gostres <- gost(query = list("interaction_padjLFC_DOWNREGULATED" = interaction_sigCounts_padjLFC_DOWN),
+                                                          organism = "dmelanogaster",
+                                                          sources = c("GO", "KEGG", "REAC", "WP")
+                                                          )
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - DOWNREGULATED Differential Genes: Interaction
+
+interaction_padjLFC_DOWNREGULATED_gostresPlot <- gostplot(interaction_padjLFC_DOWNREGULATED_gostres, interactive = FALSE)
+publish_gostplot(interaction_padjLFC_DOWNREGULATED_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("interaction_padjLFC_DOWNREGULATED_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Generate and Export GO Term Table - DOWNREGULATED Differential Genes: Interaction
+
+publish_gosttable(interaction_padjLFC_DOWNREGULATED_gostres, highlight_terms = interaction_padjLFC_DOWNREGULATED_gostres$result,
+                  use_colors = TRUE,
+                  show_columns = c("source", "term_name", "term_size", "intersection_size"),
+                  filename = paste0("interaction_padjLFC_DOWNREGULATED_GO_List_",currentDate,".pdf")
+                  )
+
+```
+
+```{r}
+# Generate and Export GO DotPlot - DOWNREGULATED Differential Genes: Interaction
+
+df_interaction_DOWNREGULATED <- data.frame(interaction_padjLFC_DOWNREGULATED_gostres$result)
+df_interaction_DOWNREGULATED$GeneRatio = df_interaction_DOWNREGULATED$intersection_size/df_interaction_DOWNREGULATED$query_size
+
+
+png(filename = paste0("interaction_padjLFC_DOWNREGULATED_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+ggplot(df_interaction_DOWNREGULATED) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colours=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(2, 10)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Interaction- DOWNREGULATED Genes - GO Analysis")
+
+dev.off()
+
+```
+
+```{r}
+# Plot and Export GO Term Plot - UPREGULATED and DOWNREGULATED Differential Genes: Interaction
+
+interaction_padjLFC_UP_DOWN_gostres <- gost(query = list("interaction_padjLFC_UPREGULATED" = interaction_sigCounts_padjLFC_UP,
+                                                         "interaction_padjLFC_DOWNREGULATED" = interaction_sigCounts_padjLFC_DOWN),
+                                                   organism = "dmelanogaster",
+                                                   sources = c("GO", "KEGG", "REAC", "WP")
+                                                   )
+
+interaction_padjLFC_UP_DOWN_gostresPlot <- gostplot(interaction_padjLFC_UP_DOWN_gostres, interactive = FALSE)
+
+publish_gostplot(interaction_padjLFC_UP_DOWN_gostresPlot,
+                      width = 8,
+                      height = 6,
+                      filename = paste0("interaction_padjLFC_UP_DOWN_GO_Plot_",currentDate,".png")
+                 )
+
+```
+
+```{r}
+# Facet Wrap GO Term Dot Plots: ALL, UP, and DOWN
+
+interaction_padjLFC_ALL_gostres <- gost(query = list( "interaction_padjLFC_ALL" = interaction_sigCounts_padjLFC,
+                                                      "interaction_padjLFC_UPREGULATED" = interaction_sigCounts_padjLFC_UP,
+                                                      "interaction_padjLFC_DOWNREGULATED" = interaction_sigCounts_padjLFC_DOWN),
+                                                          organism = "dmelanogaster",
+                                                          sources = c("GO", "KEGG", "REAC", "WP")
+                                                          )
+
+df_interaction_ALL <- data.frame(interaction_padjLFC_ALL_gostres$result)
+df_interaction_ALL$GeneRatio = df_interaction_ALL$intersection_size/df_interaction_ALL$query_size
+
+png(filename = paste0("interaction_padjLFC_ALL_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 12, 
+    height = 12, 
+    res = 500)
+
+facet.labs <- c(interaction_padjLFC_ALL = "All Differential Genes",
+                interaction_padjLFC_UPREGULATED = "Upregulated Genes",
+                interaction_padjLFC_DOWNREGULATED = "Downregulated Genes")
+
+ggplot(df_interaction_ALL) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colors=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(1.5, 6)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Interaction- GO Analysis") +
+  facet_grid(~query, labeller = as_labeller(facet.labs))
+
+dev.off()
+
+```
+
+```{r}
+# Facet Wrap GO Term Dot Plots: UP and DOWN
+
+interaction_padjLFC_UP_DOWN_gostres <- gost(query = list("interaction_padjLFC_UPREGULATED" = interaction_sigCounts_padjLFC_UP,
+                                                          "interaction_padjLFC_DOWNREGULATED" = interaction_sigCounts_padjLFC_DOWN),
+                                                          organism = "dmelanogaster",
+                                                          sources = c("GO", "KEGG", "REAC", "WP")
+                                                          )
+
+df_interaction_UP_DOWN <- data.frame(interaction_padjLFC_UP_DOWN_gostres$result)
+df_interaction_UP_DOWN$GeneRatio = df_interaction_UP_DOWN$intersection_size/df_interaction_UP_DOWN$query_size
+
+png(filename = paste0("interaction_padjLFC_UP_DOWN_GO_DotPlot_",currentDate,".png"), 
+    units = "in",
+    width = 12, 
+    height = 12, 
+    res = 500)
+
+facet.labs <- c(interaction_padjLFC_UPREGULATED = "Upregulated Genes",
+                interaction_padjLFC_DOWNREGULATED = "Downregulated Genes")
+
+ggplot(df_interaction_UP_DOWN) +
+  aes(GeneRatio, fct_reorder(term_name, GeneRatio)) +
+  geom_point(aes(color=p_value, size = intersection_size)) +
+  scale_color_gradientn(colors=c("red", "blue"), guide=guide_colorbar(reverse=TRUE, order=1)) +
+  scale_size_continuous(range=c(1.5, 6)) +
+  theme_minimal() +
+  labs(color = "p-value", size = "Gene Count") +
+  xlab("Gene Ratio") +
+  ylab(NULL) +
+  ggtitle("Interaction- Downregulated and Upregulated GO Analysis") +
+  facet_grid(~query, labeller = as_labeller(facet.labs))
+
+dev.off()
+
+```

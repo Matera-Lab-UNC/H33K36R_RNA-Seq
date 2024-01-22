@@ -1,0 +1,451 @@
+---
+title: "DESeq2_DM_dm6_forStrand_NO_OUTLIER_sexSpecific"
+author: "Benjamin McMichael"
+date: "8/15/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(DESeq2)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(EnhancedVolcano)
+library(AnnotationDbi)
+library(org.Dm.eg.db)
+
+setwd("/work/users/b/d/bdmcmi/Benjamin/flyHead_analysis/Paper_Analysis_V2/TE_Analysis/TEcounts/TEcount_multi_forStrand")
+currentDate <- Sys.Date() %>% format("%Y%m%d")
+
+```
+
+```{r}
+### Join TE Counts into TEcount Table ####
+
+files_to_read <- list.files(pattern = "*.cntTable", full.names = T)
+files_to_read
+
+all_files <- lapply(files_to_read, function(x) {
+   read.table(file = x, 
+              header = TRUE)
+}) 
+
+TEcount_Table <- reduce(all_files, full_join, by = "gene.TE") %>%
+                    tibble::column_to_rownames(var = "gene.TE")
+min_read <- 1
+TEcount_Table <- TEcount_Table[apply(TEcount_Table,1,function(x){max(x)}) > min_read,]
+
+TEcount_Table_NO_OUTLIER <- TEcount_Table[,c(1:13, 15:24)]
+colnames(TEcount_Table_NO_OUTLIER) <- sapply(colnames(TEcount_Table_NO_OUTLIER), substr, 0,20)
+
+```
+
+```{r}
+# Read in sample info
+
+sampleInfo_NO_OUTLIER <- read.csv("sample_info_NO_OUTLIER.txt")
+sampleInfo_NO_OUTLIER <- DataFrame(sampleInfo_NO_OUTLIER)
+
+```
+
+```{r}
+# Check sample order
+
+colnames(TEcount_Table_NO_OUTLIER)
+rownames(sampleInfo_NO_OUTLIER) 
+all(rownames(sampleInfo_NO_OUTLIER) == colnames(TEcount_Table_NO_OUTLIER))
+
+#all(sampleInfo_NO_OUTLIER$run == colnames(TEcount_Table_NO_OUTLIER))
+
+```
+
+```{r}
+### NO Interaction Model ####
+
+sex_age_geno <- factor(c("f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "m_young_K36R", "f_old_K36R", "m_old_K36R",
+                  "f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "f_old_K36R", "m_old_K36R",
+                  "f_young_Adel", "m_young_Adel", "f_old_Adel", "m_old_Adel",
+                  "f_young_K36R", "m_young_K36R", "f_old_K36R", "m_old_K36R")
+                            )
+
+sampleInfo_NO_OUTLIER_sex_age_geno <- sampleInfo_NO_OUTLIER
+sampleInfo_NO_OUTLIER_sex_age_geno$sex_age_geno <- sex_age_geno
+
+dds <- DESeqDataSetFromMatrix(countData = TEcount_Table_NO_OUTLIER, colData = sampleInfo_NO_OUTLIER_sex_age_geno, design = ~ sex_age_geno)
+dds <- DESeq(dds)
+
+```
+
+```{r}
+# Export normalized counts
+
+normCounts <- counts(dds, normalized=T)
+write.csv(as.data.frame(normCounts), 
+          file = paste0("DESeq2_",currentDate,"_dm6_forStrand_noINT_noOUT_Sex_normCounts.csv"))
+
+```
+
+```{r}
+# youngFemaleFly Results
+
+youngFemaleFly_res <- results(dds, contrast = c("sex_age_geno", "f_young_K36R", "f_young_Adel"))
+summary(youngFemaleFly_res, 0.05)
+
+```
+
+```{r}
+
+youngFemaleFly_res_df <- data.frame(youngFemaleFly_res) %>%
+  tibble::rownames_to_column("Gene")
+
+youngFemaleFly_res_TE <- youngFemaleFly_res_df %>%
+  filter(!grepl("FBgn", Gene))
+
+png(filename = paste0("youngFemaleFly_TEcount_dm6_forStrand_TEspecific_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(youngFemaleFly_res_TE,
+                lab = youngFemaleFly_res_TE$Gene,
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Young Female Fly Differential TEcount: TE specific",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngFemaleFly_sigCount_padj <- youngFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFemaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngFemaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngFemaleFly_sigCount_padjLFC <- youngFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngFemaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngFemaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full youngFemaleFly results
+
+youngFemaleFly_resOrdered <- youngFemaleFly_res[order(youngFemaleFly_res$padj),]
+write.csv(as.data.frame(youngFemaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngFemaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# oldFemaleFly Results
+
+oldFemaleFly_res <- results(dds, contrast = c("sex_age_geno", "f_old_K36R", "f_old_Adel"))
+summary(oldFemaleFly_res, 0.05)
+
+```
+
+```{r}
+
+oldFemaleFly_res_df <- data.frame(oldFemaleFly_res) %>%
+  tibble::rownames_to_column("Gene")
+
+oldFemaleFly_res_TE <- oldFemaleFly_res_df %>%
+  filter(!grepl("FBgn", Gene))
+
+png(filename = paste0("oldFemaleFly_TEcount_dm6_forStrand_TEspecific_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(oldFemaleFly_res_TE,
+                lab = oldFemaleFly_res_TE$Gene,
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Old Female Fly Differential TEcount: TE specific",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldFemaleFly_sigCount_padj <- oldFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFemaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldFemaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldFemaleFly_sigCount_padjLFC <- oldFemaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldFemaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldFemaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full oldFemaleFly results
+
+oldFemaleFly_resOrdered <- oldFemaleFly_res[order(oldFemaleFly_res$padj),]
+write.csv(as.data.frame(oldFemaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldFemaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# youngMaleFly Results
+
+youngMaleFly_res <- results(dds, contrast = c("sex_age_geno", "m_young_K36R", "m_young_Adel"))
+summary(youngMaleFly_res, 0.05)
+
+```
+
+```{r}
+
+youngMaleFly_res_df <- data.frame(youngMaleFly_res) %>%
+  tibble::rownames_to_column("Gene")
+
+youngMaleFly_res_TE <- youngMaleFly_res_df %>%
+  filter(!grepl("FBgn", Gene))
+
+png(filename = paste0("youngMaleFly_TEcount_dm6_forStrand_TEspecific_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(youngMaleFly_res_TE,
+                lab = youngMaleFly_res_TE$Gene,
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Young Male Fly Differential TEcount: TE Specific",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+youngMaleFly_sigCount_padj <- youngMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngMaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+youngMaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+youngMaleFly_sigCount_padjLFC <- youngMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(youngMaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+youngMaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full youngMaleFly results
+
+youngMaleFly_resOrdered <- youngMaleFly_res[order(youngMaleFly_res$padj),]
+write.csv(as.data.frame(youngMaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_youngMaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
+
+```{r}
+# oldMaleFly Results
+
+oldMaleFly_res <- results(dds, contrast = c("sex_age_geno", "m_old_K36R", "m_old_Adel"))
+summary(oldMaleFly_res, 0.05)
+
+```
+
+```{r}
+
+oldMaleFly_res_df <- data.frame(oldMaleFly_res) %>%
+  tibble::rownames_to_column("Gene")
+
+oldMaleFly_res_TE <- oldMaleFly_res_df %>%
+  filter(!grepl("FBgn", Gene))
+
+png(filename = paste0("oldMaleFly_TEcount_dm6_forStrand_TEspecific_volcanoPlot_",currentDate,".png"), 
+    units = "in",
+    width = 9, 
+    height = 6, 
+    res = 500)
+
+EnhancedVolcano(oldMaleFly_res_TE,
+                lab = oldMaleFly_res_TE$Gene,
+                #selectLab = c(""),
+                x = 'log2FoldChange',
+                y = 'padj',
+                pCutoff = 0.05,
+                legendPosition = 'right',
+                legendLabels=c('Not sig.','Log2 FC','p-value',
+                               'p-value & Log2 FC'),
+                title = "Old Male Fly Differential TEcount: TE Specific",
+                legendLabSize = 16,
+                legendIconSize = 5.0)
+
+dev.off()
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value) that correspond to MA-plots and Venn diagrams
+
+oldMaleFly_sigCount_padj <- oldMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        #dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldMaleFly_sigCount_padj['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value
+
+oldMaleFly_sigCount_padj %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_padj_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Count number of significantly up and down genes (by adjusted p-value and LFC) that correspond to MA-plots and Venn diagrams
+
+oldMaleFly_sigCount_padjLFC <- oldMaleFly_res %>%
+                        data.frame() %>%
+                        dplyr::filter(padj < 0.05) %>% 
+                        dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>%
+                        dplyr::mutate(Enrichment = ifelse(log2FoldChange > 0, 'Up', 'Down'))
+table(oldMaleFly_sigCount_padjLFC['Enrichment'])
+
+```
+
+```{r}
+# Export significant counts by adjusted p-value and LFC
+
+oldMaleFly_sigCount_padjLFC %>%
+  write.csv(., file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_padjLFC_sigCounts.csv")
+  )
+
+```
+
+```{r}
+# Export full oldMaleFly results
+
+oldMaleFly_resOrdered <- oldMaleFly_res[order(oldMaleFly_res$padj),]
+write.csv(as.data.frame(oldMaleFly_resOrdered), 
+          file = paste0("DESeq2_",currentDate,"_oldMaleFly_dm6_forStrand_noINT_noOUT_res.csv"))
+
+```
