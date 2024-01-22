@@ -1,8 +1,6 @@
-# Directory created on 06-26-2023
+# CHD1 Fly Head RNA-Seq Analysis
+## Directory created on 06-26-2023
 ## By Benjamin McMichael
-
-------------------------------------------------------------------------------------------------------------------
-# Contents:
 
 ## Fastq files loaded from SRA using SRA-Toolkit.
 
